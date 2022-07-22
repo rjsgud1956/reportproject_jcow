@@ -1,7 +1,8 @@
+from datetime import datetime
 #################보고서 제작#################보고서 제작#################보고서 제작#################보고서 제작#################
 
 # 보고서 제작 class,def 모음
-from turtle import width
+from turtle import end_fill, width
 from docx import Document
 from docx.enum.section import WD_ORIENTATION
 
@@ -26,7 +27,6 @@ from docx.enum.text import WD_BREAK
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.table import WD_ROW_HEIGHT_RULE
 from docx.enum.section import WD_ORIENTATION
-
 
 # font color
 from docx.shared import RGBColor
@@ -136,8 +136,34 @@ def add_float_picture(p, image_path_or_stream, width=None, height=None, pos_x=0,
     run._r.add_drawing(anchor)
 
 
+# 셀 마진 변경
 # refer to docx.oxml.__init__.py
 register_element_cls('wp:anchor', CT_Anchor)
+
+from docx.oxml.shared import OxmlElement
+from docx.oxml.ns import qn
+
+def set_cell_margins(cell, **kwargs):
+    """
+    cell:  actual cell instance you want to modify
+    usage:
+        set_cell_margins(cell, top=50, start=50, bottom=50, end=50)
+
+    provided values are in twentieths of a point (1/1440 of an inch).
+    read more here: http://officeopenxml.com/WPtableCellMargins.php
+    """
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    tcMar = OxmlElement('w:tcMar')
+
+    for m in ["top", "start", "bottom", "end"]:
+        if m in kwargs:
+            node = OxmlElement("w:{}".format(m))
+            node.set(qn('w:w'), str(kwargs.get(m)))
+            node.set(qn('w:type'), 'dxa')
+            tcMar.append(node)
+
+    tcPr.append(tcMar)
 
 # 문단 텍스트 입력
 def paragraphText(paragraph,text,fontsize,color,alignment,style):
@@ -145,20 +171,27 @@ def paragraphText(paragraph,text,fontsize,color,alignment,style):
     text.font.size = Pt(fontsize) 
     font = text.font
     font.color.rgb = RGBColor.from_string(color)
+
     if alignment == 'CENTER':
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    elif alignment == 'RIGHT':
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     else:
         pass
+
     if style == 'bold':
         text.bold = True
     else:
         pass
+
+    return text
 
 def lineSpace(doc,inches,space_before,space_after):
     lineSpace = doc.add_paragraph()
     lineSpace.paragraph_format.line_spacing = Inches(inches)
     lineSpace.paragraph_format.space_before = Pt(space_before)
     lineSpace.paragraph_format.space_after = Pt(space_after)
+    return lineSpace
 
 # table 제작
 def makeTable(paragraph,row,col,alignment,width,height):
@@ -329,6 +362,7 @@ def insertTextCell(table,row,col,text,color,fontSize,fontStyle,vertical_alignmen
     paragraph.paragraph_format.space_after = space_after
 
     font.size = Pt(fontSize)
+    return paragraph
 
 # 셀 병합
 def cellMerge(table,stdCellList,cellList):
@@ -339,7 +373,7 @@ def cellMerge(table,stdCellList,cellList):
 
 # header 박스 만들기
 def makeHeaderBox(No,text):
-    headerBoxWidth = [Cm(1.5), Cm(1), Cm(24.5)]
+    headerBoxWidth = [Cm(1.5), Cm(0.5), Cm(17)]
     headerBoxHeight = [Cm(1)]
     headerBox = makeTable(doc,row=1,col=3,alignment='CENTER',width=headerBoxWidth,height=headerBoxHeight)
     set_cell_border(
@@ -394,6 +428,8 @@ def set_repeat_table_header(row):
 
 
 farmNameReport = 'test'
+reportYear = [2017,2018,2019,2020,2021]
+reportName = "J - cow"
 
 # 문서 생성
 doc = Document()
@@ -422,21 +458,1345 @@ current_section.right_margin = Cm(1)
 sign = doc.add_paragraph()
 
 # 사진의 크기를 Cm 단위로 설정하여 삽입
-add_float_picture(sign,'./signPicture/page.png',width=Cm(21.59), height=Cm(27.94),pos_x=Cm(0), pos_y=Cm(0))
+add_float_picture(sign,'./Service/signPicture/page.png',width=Cm(21.59), height=Cm(27.94),pos_x=Cm(0), pos_y=Cm(0))
 
+date = datetime.today().strftime("%Y-%m-%d")
+page1Date = lineSpace(doc,inches=0.8,space_before=0,space_after=0)
+paragraphText(sign,f'작성자 : FarmPlace, 작성일 : {date}',fontsize=12,color='000000',alignment='RIGHT',style='bold')
 lineSpace(doc,inches=0.6,space_before=0,space_after=0)
-lineSpace(doc,inches=0.6,space_before=0,space_after=0)
-lineSpace(doc,inches=0.6,space_before=0,space_after=0)
+page1Text = lineSpace(doc,inches=0.6,space_before=0,space_after=0)
+paragraphText(page1Text,f'< {reportName} 농가현황 및 유전능력평가 > ',fontsize=12,color='000000',alignment='CENTER',style='bold')
+lineSpace(doc,inches=1,space_before=0,space_after=0)
 
 paraTitle1 = doc.add_paragraph()
-title1 = paragraphText(paraTitle1,text='한우',fontsize = 32,color='000000',alignment='CENTER',style='bold')
+title1 = paragraphText(paraTitle1,text=f'{reportName}',fontsize = 35,color='000000',alignment='CENTER',style='bold')
 
 paraTitle2 = doc.add_paragraph()
-title2 = paragraphText(paraTitle2,text='유전체 보고서',fontsize = 32,color='000000',alignment='CENTER',style='bold')
+title2 = paragraphText(paraTitle2,text='한우 컨설팅 보고서',fontsize = 35,color='000000',alignment='CENTER',style='bold')
 
 paraTitle3 = doc.add_paragraph()
-title3 = paragraphText(paraTitle3,text=f'{farmNameReport} 농장',fontsize = 18,color='000000',alignment='CENTER',style='bold')
+title3 = paragraphText(paraTitle3,text=f'{farmNameReport} 농장',fontsize = 25,color='000000',alignment='CENTER',style='bold')
 
 # page1 표지 만들기 완료
+
+# page2 목차 만들기
+doc.add_page_break()
+
+# 목차 만들기
+# lineSpace(doc,inches=0.3,space_before=0,space_after=0)
+
+indexBoxWidth = [Cm(19.59)]
+indexBoxHeight = [Cm(25.94)]
+indexBox = makeTable(doc,row=1,col=1,alignment='CENTER',width=indexBoxWidth,height=indexBoxHeight)
+
+# 목차 테두리 완성
+titleBorder(
+            indexBox,
+            top_val = 'single',
+            top_color = '#F58D22',
+            top_sz = '25',
+            bottom_val = 'single',
+            bottom_color = '#F58D22',
+            bottom_sz = '25',
+            left_val = 'single',
+            left_color = '#F58D22',
+            left_sz = '25',
+            right_val = 'single',
+            right_color = '#F58D22',
+            right_sz = '25'
+            )
+
+# title 박스 생성
+indexBoxCell0_0 = indexBox.rows[0].cells[0]
+
+titleBoxWidth = [Cm(17)]
+titleBoxHeights = [Cm(0.5),Cm(0.5)]
+titleBox = makeTable(indexBoxCell0_0,row=2,col=1,alignment='CENTER',width=titleBoxWidth,height=titleBoxHeights)
+# titleBox.style = 'Book Title'
+titleBoxCell0_0 = titleBox.rows[0].cells[0]
+
+# title 박스 테두리 변경
+set_cell_border(
+    titleBox,
+    row=0,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "single", "sz":"20", "color":"#F58D22"},
+    start={"val": "nil"},
+    end={"val": "nil"},
+)
+
+# title 박스 텍스트 입력
+insertTextCell(
+                titleBox,
+                row=0,
+                col=0,
+                text=f'{reportName} 컨설팅 보고서',
+                color='000000',
+                fontSize=13,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='RIGHT',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleBox,
+                row=1,
+                col=0,
+                text='C',
+                color='843C0C',
+                fontSize=20,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='LEFT',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleBox,
+                row=1,
+                col=0,
+                text='ONTENTS',
+                color='F58D22',
+                fontSize=20,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='LEFT',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+# 목차 리스트 table 생성
+titleListWidth = [Cm(2),Cm(15)]
+titleListHeights = [Cm(1),Cm(0.1),Cm(1),Cm(0.1),Cm(1),Cm(0.1),Cm(1),Cm(0.1),Cm(1),Cm(0.1),Cm(1),Cm(0.1),Cm(1),Cm(0.1),Cm(1),Cm(0.1)]
+titleList = makeTable(indexBoxCell0_0,row=15,col=2,alignment='CENTER',width=titleListWidth,height=titleListHeights)
+
+# 목차 리스트 para style 변경
+for i in range(15):
+    for j in range(2):
+        paragraph = titleList.rows[i].cells[j].paragraphs[0]
+        paragraph.style = 'Caption'
+
+# 목차 리스트 table cell 병합
+stdCellList1 = [1,0]
+cellList1 = [[1,1]]
+cellMerge(titleList,stdCellList1,cellList1)
+
+stdCellList2 = [3,0]
+cellList2 = [[3,1]]
+cellMerge(titleList,stdCellList2,cellList2)
+
+stdCellList3 = [5,0]
+cellList3 = [[5,1]]
+cellMerge(titleList,stdCellList3,cellList3)
+
+stdCellList4 = [7,0]
+cellList4 = [[7,1]]
+cellMerge(titleList,stdCellList4,cellList4)
+
+stdCellList5 = [9,0]
+cellList5 = [[9,1]]
+cellMerge(titleList,stdCellList5,cellList5)
+
+stdCellList6 = [11,0]
+cellList6 = [[11,1]]
+cellMerge(titleList,stdCellList6,cellList6)
+
+stdCellList7 = [13,0]
+cellList7 = [[13,1]]
+cellMerge(titleList,stdCellList7,cellList7)
+
+# 목차 리스트 table fontsize 설정
+indexFontSize = 20
+titleFontSize = 15
+
+# 목차 리스트 table 텍스트 입력
+insertTextCell(
+                titleList,
+                row=0,
+                col=0,
+                text='01',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=0,
+                col=1,
+                text=' 농가 정보',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=1,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=2,
+                col=0,
+                text='02',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=2,
+                col=1,
+                text=' 도축성적 추세 현황',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=3,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=4,
+                col=0,
+                text='03',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=4,
+                col=1,
+                text=' 씨수소(KPN정액) 사용 현황',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=5,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=6,
+                col=0,
+                text='04',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=6,
+                col=1,
+                text=' 유전능력 현황',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=7,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=8,
+                col=0,
+                text='05',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=8,
+                col=1,
+                text=' 개체별 유전능력 유형분류',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=9,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=10,
+                col=0,
+                text='06',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=10,
+                col=1,
+                text=' 선발지수 적용 농가개체순위',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=10,
+                col=1,
+                text=' (도체중우선)',
+                color='000000',
+                fontSize=12,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=11,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=12,
+                col=0,
+                text='07',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=12,
+                col=1,
+                text=' 선발지수 적용 농가개체순위',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+                
+insertTextCell(
+                titleList,
+                row=12,
+                col=1,
+                text=' (근내지방우선)',
+                color='000000',
+                fontSize=12,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=13,
+                col=0,
+                text=' ',
+                color='000000',
+                fontSize=1,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=14,
+                col=0,
+                text='08',
+                color='F58D22',
+                fontSize=indexFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                titleList,
+                row=14,
+                col=1,
+                text=f' {reportName} 컨설팅 농가 유전능력 평균 현황',
+                color='000000',
+                fontSize=titleFontSize,
+                fontStyle='bold',
+                vertical_alignment='CENTER',
+                para_alignment=None,
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+# 목차 리스트 table 테두리 변경
+set_cell_border(
+    titleList,
+    row=0,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "nil"},
+    start={"val": "nil"},
+    end={"val": "single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=2,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val":"nil"},
+    start={"val":"nil"},
+    end={"val":"single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=4,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "nil"},
+    start={"val": "nil"},
+    end={"val": "single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=6,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "nil"},
+    start={"val": "nil"},
+    end={"val": "single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=8,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "nil"},
+    start={"val": "nil"},
+    end={"val": "single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=10,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val":"nil"},
+    start={"val":"nil"},
+    end={"val":"single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=12,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "nil"},
+    start={"val": "nil"},
+    end={"val": "single", "sz":"15"},
+)
+
+set_cell_border(
+    titleList,
+    row=14,
+    col=0,
+    top={"val": "nil"},
+    bottom={"val": "nil"},
+    start={"val": "nil"},
+    end={"val": "single", "sz":"15"},
+)
+
+# note table 생성
+noteWidth = [Cm(18)]
+noteHeights = [Cm(5)]
+noteBox = makeTable(indexBoxCell0_0,row=1,col=1,alignment='CENTER',width=noteWidth,height=noteHeights)
+
+titleBorder(
+            noteBox,
+            top_val = 'single',
+            top_color = '#F58D22',
+            top_sz = '3',
+            bottom_val = 'single',
+            bottom_color = '#F58D22',
+            bottom_sz = '3',
+            left_val = 'single',
+            left_color = '#F58D22',
+            left_sz = '3',
+            right_val = 'single',
+            right_color = '#F58D22',
+            right_sz = '3'
+            )
+
+noteBoxPara1 = noteBox.rows[0].cells[0].paragraphs[0]
+noteBoxPara1.paragraph_format.left_indent = Inches(0.1)           
+note1 = paragraphText(
+                        noteBoxPara1,
+                        text='\n* 보고서에 사용된 사육 및 도축 정보의 경우 농가별 이력제 및 축사로 데이터를 기준으로 작성되었습니다.',
+                        fontsize = 10,
+                        color='000000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+
+noteBoxPara2 = noteBox.rows[0].cells[0].add_paragraph()
+noteBoxPara2 = noteBox.rows[0].cells[0].paragraphs[1]
+noteBoxPara2.paragraph_format.left_indent = Inches(0.1)             
+note2 = paragraphText(
+                        noteBoxPara2,
+                        text='* 도축 정보의 경우 해당 ',
+                        fontsize = 10,
+                        color='000000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+note2 = paragraphText(
+                        noteBoxPara2,
+                        text='이력제기관(축협, 한우협회)을 통해 전달받은 정보',
+                        fontsize = 10,
+                        color='FF0000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+note2 = paragraphText(
+                        noteBoxPara2,
+                        text='를 사용합니다.',
+                        fontsize = 10,
+                        color='000000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+
+noteBoxPara3 = noteBox.rows[0].cells[0].add_paragraph()
+noteBoxPara3 = noteBox.rows[0].cells[0].paragraphs[2] 
+noteBoxPara3.paragraph_format.left_indent = Inches(0.1)   
+note3 = paragraphText(
+                        noteBoxPara3,
+                        text='* 4page에 ',
+                        fontsize = 10,
+                        color='000000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+note3 = paragraphText(
+                        noteBoxPara3,
+                        text='도축 그래프가 없는 번식농가의 경우 ',
+                        fontsize = 10,
+                        color='FF0000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+note3 = paragraphText(
+                        noteBoxPara3,
+                        text='자가 출하된 거세우 기록이 크롤링 되지 않았기 때문에\n  그래프를 적용할 수 없습니다.',
+                        fontsize = 10,
+                        color='000000',
+                        alignment='LEFT',
+                        style='bold'
+                        )
+
+# doc.add_page_break()
+
+# page2 목차 만들기 완료
+
+# page3 농가 현황 및 추세 만들기 완료
+
+makeHeaderBox("01","농가 정보")
+lineSpace(doc,inches=0.5,space_before=0,space_after=0)
+
+paraTitle = doc.add_paragraph()
+paraTitle.paragraph_format.left_indent = Inches(0.3)
+paraTitle.paragraph_format.space_before = Pt(0)
+paraTitle.paragraph_format.space_after = Pt(0)  
+
+paragraphText(paraTitle,text='▶',fontsize=13,color='F58D22',alignment='NONE',style='bold')
+paragraphText(paraTitle,text=' 농가 정보',fontsize=13,color='000000',alignment='NONE',style='bold')
+
+# # 농가정보 table 생성
+farmInfoWidth = [Cm(2.5),Cm(15.5)]
+farmInfoHeights = [Cm(1),Cm(1)]
+farmInfoBox = makeTable(doc,row=2,col=2,alignment='CENTER',width=farmInfoWidth,height=farmInfoHeights)
+farmInfoFontSize = 9
+farmInfoFontStyle = 'bold'
+
+setCellVal = "dashSmallGap"
+
+titleBorder(
+            farmInfoBox,
+            top_val = "single",
+            top_color = '#F58D22',
+            top_sz = '5',
+            bottom_val = "single",
+            bottom_color = '#F58D22',
+            bottom_sz = '5',
+            left_val = "single",
+            left_color = '#F58D22',
+            left_sz = '5',
+            right_val = "single",
+            right_color = '#F58D22',
+            right_sz = '5'
+            )
+
+set_cell_border(
+    farmInfoBox,
+    row=0,
+    col=0,
+    bottom={"val": setCellVal, "sz":"5"},
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmInfoBox,
+    row=0,
+    col=1,
+    bottom={"val": setCellVal, "sz":"5"},
+    start={"val": "single", "sz":"5", "color" : "#F58D22"},
+    end={"val": "nil"},
+)
+
+set_cell_border(
+    farmInfoBox,
+    row=1,
+    col=0,
+    top={"val": setCellVal, "sz":"5"},
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmInfoBox,
+    row=1,
+    col=1,
+    top={"val": setCellVal, "sz":"5"},
+    start={"val": "single", "sz":"5", "color" : "#F58D22"},
+    end={"val": "nil"},
+)
+
+cellBackColor(farmInfoBox, row=0, cell=0, color = 'FDECDA')
+
+cellBackColor(farmInfoBox, row=1, cell=0, color = 'FDECDA')
+
+insertTextCell(
+                farmInfoBox,
+                row=0,
+                col=0,
+                text='이 름',
+                color='000000',
+                fontSize=farmInfoFontSize,
+                fontStyle=farmInfoFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                farmInfoBox,
+                row=1,
+                col=0,
+                text='위 치',
+                color='000000',
+                fontSize=farmInfoFontSize,
+                fontStyle=farmInfoFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+lineSpace(doc,inches=0.5,space_before=0,space_after=0)
+
+paraTitle = doc.add_paragraph()
+paraTitle.paragraph_format.left_indent = Inches(0.3)
+paraTitle.paragraph_format.space_before = Pt(0)
+paraTitle.paragraph_format.space_after = Pt(0)  
+
+paragraphText(paraTitle,text='▶',fontsize=13,color='F58D22',alignment='NONE',style='bold')
+paragraphText(paraTitle,text=' 농가 현황',fontsize=13,color='000000',alignment='NONE',style='bold')
+lineSpace(doc,inches=0.01,space_before=0,space_after=0)
+
+# # 목차 리스트 table 생성
+farmStatusWidth = [Cm(5),Cm(4),Cm(4),Cm(5)]
+# farmStatusHeights = [Cm(1),Cm(1)]
+farmStatusBox = makeTable(doc,row=5,col=4,alignment='CENTER',width=farmStatusWidth,height=None)
+farmStatusFontSize = 9
+farmStatusFontStyle = 'bold'
+
+titleBorder(
+            farmStatusBox,
+            top_val = 'single',
+            top_color = '#F58D22',
+            top_sz = '5',
+            bottom_val = 'single',
+            bottom_color = '#F58D22',
+            bottom_sz = '5',
+            left_val = 'single',
+            left_color = '#F58D22',
+            left_sz = '5',
+            right_val = 'single',
+            right_color = '#F58D22',
+            right_sz = '5'
+            )
+
+insertTextCell(
+                farmStatusBox,
+                row=0,
+                col=0,
+                text='구 분',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+superscript = insertTextCell(
+                            farmStatusBox,
+                            row=0,
+                            col=1,
+                            text='도축두수',
+                            color='000000',
+                            fontSize=farmStatusFontSize,
+                            fontStyle=farmStatusFontStyle,
+                            vertical_alignment='CENTER',
+                            para_alignment='CENTER',
+                            space_after=Pt(0),
+                            space_before=Pt(0)
+                            )
+
+sub_text = superscript.add_run('1:')
+sub_text.font.size  = Pt(7)
+sub_text.font.superscript  = True
+
+insertTextCell(
+                farmStatusBox,
+                row=0,
+                col=3,
+                text='사육두수',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                farmStatusBox,
+                row=1,
+                col=1,
+                text='외부',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                farmStatusBox,
+                row=1,
+                col=2,
+                text='내부',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                farmStatusBox,
+                row=2,
+                col=0,
+                text='수',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                farmStatusBox,
+                row=3,
+                col=0,
+                text='암',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                farmStatusBox,
+                row=4,
+                col=0,
+                text='합계',
+                color='000000',
+                fontSize=farmStatusFontSize,
+                fontStyle=farmStatusFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+
+cellBackColor(farmStatusBox, row=0, cell=0, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=0, cell=1, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=0, cell=3, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=1, cell=1, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=1, cell=2, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=2, cell=0, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=3, cell=0, color = 'FDECDA')
+cellBackColor(farmStatusBox, row=4, cell=0, color = 'FDECDA')
+
+setCellVal = "dashSmallGap"
+
+set_cell_border(
+    farmStatusBox,
+    row=0,
+    col=0,
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=1,
+    col=0,
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=2,
+    col=0,
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=3,
+    col=0,
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=4,
+    col=0,
+    start={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=0,
+    col=3,
+    end={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=1,
+    col=3,
+    end={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=2,
+    col=3,
+    end={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=3,
+    col=3,
+    end={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=4,
+    col=3,
+    end={"val": "nil"},
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=3,
+    col=0,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=3,
+    col=1,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=3,
+    col=2,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=3,
+    col=3,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=2,
+    col=0,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=2,
+    col=1,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=2,
+    col=2,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    farmStatusBox,
+    row=2,
+    col=3,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+# 농가 현황 table cell 병합
+stdCellList1 = [0,1]
+cellList1 = [[0,2]]
+cellMerge(farmStatusBox,stdCellList1,cellList1)
+
+stdCellList2 = [0,0]
+cellList2 = [[1,0]]
+cellMerge(farmStatusBox,stdCellList2,cellList2)
+
+stdCellList3 = [0,3]
+cellList3 = [[1,3]]
+cellMerge(farmStatusBox,stdCellList3,cellList3)
+
+
+paraTitle = doc.add_paragraph()
+paraTitle.paragraph_format.left_indent = Inches(0.3)
+paraTitle.paragraph_format.space_before = Pt(0)
+paraTitle.paragraph_format.space_after = Pt(0)  
+
+paraSuperscript = paragraphText(paraTitle,text='1:',fontsize=7,color='000000',alignment='NONE',style='None')
+
+paraSuperscript.font.size  = Pt(7)
+paraSuperscript.font.superscript  = True
+
+paragraphText(paraTitle,text='농가 도축성적 추세 분석을 위해 추적한 정보로 추정치임',fontsize=7,color='000000',alignment='NONE',style='None')
+
+
+# 도축성적추세현황 header 생성
+lineSpace(doc,inches=0.7,space_before=0,space_after=0)
+makeHeaderBox("02","도축성적 추세 현황")
+lineSpace(doc,inches=0.3,space_before=0,space_after=0)
+
+paraTitle = doc.add_paragraph()
+paraTitle.paragraph_format.left_indent = Inches(0.3)
+paraTitle.paragraph_format.space_before = Pt(0)
+paraTitle.paragraph_format.space_after = Pt(0)  
+
+paragraphText(paraTitle,text='▶',fontsize=13,color='F58D22',alignment='NONE',style='bold')
+paragraphText(paraTitle,text=' 도축개월령 현황표',fontsize=13,color='000000',alignment='NONE',style='bold')
+
+
+# 도축성적추세현황 table 생성
+abattMonthWidth = [Cm(4.5),Cm(2.7),Cm(2.7),Cm(2.7),Cm(2.7),Cm(2.7)]
+abattMonthHeight = [Cm(1),Cm(1),Cm(1)]
+abattMonthBox = makeTable(doc,row=3,col=6,alignment='CENTER',width=abattMonthWidth,height=abattMonthHeight)
+abattMonthFontSize = 9
+abattMonthFontStyle = 'bold'
+
+titleBorder(
+            abattMonthBox,
+            top_val = 'single',
+            top_color = '#F58D22',
+            top_sz = '5',
+            bottom_val = 'single',
+            bottom_color = '#F58D22',
+            bottom_sz = '5',
+            left_val = 'single',
+            left_color = '#F58D22',
+            left_sz = '5',
+            right_val = 'single',
+            right_color = '#F58D22',
+            right_sz = '5'
+            )
+
+insertTextCell(
+                abattMonthBox,
+                row=0,
+                col=0,
+                text='연도',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=1,
+                col=0,
+                text='내부 도축개월령',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=2,
+                col=0,
+                text='외부 도축개월령',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=0,
+                col=1,
+                text=f'{str(reportYear[0])}',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=0,
+                col=2,
+                text=f'{str(reportYear[1])}',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=0,
+                col=3,
+                text=f'{str(reportYear[2])}',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=0,
+                col=4,
+                text=f'{str(reportYear[3])}',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+insertTextCell(
+                abattMonthBox,
+                row=0,
+                col=5,
+                text=f'{str(reportYear[4])}',
+                color='000000',
+                fontSize=abattMonthFontSize,
+                fontStyle=abattMonthFontStyle,
+                vertical_alignment='CENTER',
+                para_alignment='CENTER',
+                space_after=Pt(0),
+                space_before=Pt(0)
+                )
+
+cellBackColor(abattMonthBox, row=0, cell=0, color = 'FDECDA')
+cellBackColor(abattMonthBox, row=0, cell=1, color = 'FDECDA')
+cellBackColor(abattMonthBox, row=0, cell=2, color = 'FDECDA')
+cellBackColor(abattMonthBox, row=0, cell=3, color = 'FDECDA')
+cellBackColor(abattMonthBox, row=0, cell=4, color = 'FDECDA')
+cellBackColor(abattMonthBox, row=0, cell=5, color = 'FDECDA')
+
+setCellVal = "dashSmallGap"
+set_cell_border(
+    abattMonthBox,
+    row=2,
+    col=0,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=2,
+    col=1,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=2,
+    col=2,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=2,
+    col=3,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=2,
+    col=4,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=2,
+    col=5,
+    top={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=1,
+    col=0,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=1,
+    col=1,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=1,
+    col=2,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=1,
+    col=3,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=1,
+    col=4,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+set_cell_border(
+    abattMonthBox,
+    row=1,
+    col=5,
+    bottom={"val": setCellVal, "sz":"5"}
+)
+
+doc.add_page_break()
 
 doc.save('유전체보고서.docx')
